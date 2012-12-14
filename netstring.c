@@ -14,34 +14,44 @@
  *
  */
 
-/*
- * Netstring protocol implementation
- * 
- * char * netstring_encode(const char * str);
- * void * netstring_decode(const char *str, size_t *size)
- *
- */
-
+#include <stdio.h> /* snprintf */
+#include <stdlib.h> /* strtoll */
+#include <string.h> /* memcpy */
+#include <errno.h> /* errno */
+#include <limits.h> /* LONG_MAX, LONG_MIN */
 
 #include "netstring.h"
 
+#define SIZE_BUFFER_SZ 39
+
 char *
-netstring_encode(const char * str, size_t size)
+netstring_encode(const void *data, size_t size, size_t *res_size)
 {
-	int msg_buf_sz = (int)size + (int) strlen(str) + 2;
-	char msg_buf[39];
-	char * data;
+	int rc;
+	char *res;
+	char size_buf[SIZE_BUFFER_SZ];
+	size_t msg_buf_sz = size + 3; /* 3 bytes extra for ':', ',', and '\x00' */
 
-	snprintf(msg_buf, msg_buf_sz, "%d:%s,", (int) size, str); /* formatting to: length:string, */
+	rc = snprintf(size_buf, sizeof(size_buf), "%u", (unsigned int)size);
 
-	#ifdef DEBUG
-		printf("msg_buf: '%s'\n", msg_buf);
-	#endif
+	if (rc < 0) /* We encountered an error */
+		return NULL;
+	else if (rc >= (int)sizeof(size_buf)) /* Size of data is dangerously more than
+											 what we can handle. ABORT! */
+		return NULL;
+	else /* We successfully converted the size into a char array */
+		msg_buf_sz += rc;
 
-	data = (char *) malloc(msg_buf_sz * sizeof(char));
-	return memcpy(data, msg_buf, msg_buf_sz);
+	res = (char *) malloc(msg_buf_sz);
+	*res_size = snprintf(res, msg_buf_sz, "%s:%s,", size_buf,
+			(const char *)data);
+
+	/* Note that res_size will not include '\x00' */
+	if (*res_size + 1 != msg_buf_sz) /* Something aweful happened */
+		return NULL;
+
+	return res;
 }
-
 
 void *
 netstring_decode(const char *str, size_t *size)
