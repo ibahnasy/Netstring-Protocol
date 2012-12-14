@@ -54,26 +54,22 @@ netstring_encode(const void *data, size_t size, size_t *res_size)
 }
 
 void *
-netstring_decode(const char *str, size_t *size)
+netstring_decode(const char *data, size_t *size)
 {
-	char *data;
-	char msg_buf_sz[39]; /* Enough to store a string of size more than
-						  * 2**128 or aprox. 10^38.532 bytes. Way more than a Yottabyte */
+	char *res;
+	char msg_buf_sz[SIZE_BUFFER_SZ]; /* Enough to store a string of size more than
+										2^128 or aprox. 10^38.532 bytes. Way more than a Yottabyte */
 	char *endptr;
-	register int i = 0;
-
-	#ifdef DEBUG
-		printf("str: %s\n", str); /* Mark your debug commands if used without macros. */
-	#endif
+	register unsigned int i = 0;
 
 	/* Make sure msg_buf_sz does not overflow. */
-	while(*str != ':' && i < (int) sizeof(msg_buf_sz))
+	while(*data != ':' && i < sizeof(msg_buf_sz))
 	{
-		msg_buf_sz[i] = *str++;
+		msg_buf_sz[i] = *data++;
 		++i;
 	}
 
-	++str; /* Advance `str' pointer past ':' */
+	++data; /* Advance `data' pointer past ':' */
 
 	*size = strtoll(msg_buf_sz, &endptr, 10);
 
@@ -84,17 +80,12 @@ netstring_decode(const char *str, size_t *size)
 	}
 
 	/* Past this point we know that we parsed a length successfuly. */
-	if (str[*size] != ',') /* Check if the data field ends with ',' per standard */
+	if (data[*size] != ',') /* Check if the data field ends with ',' per standard */
 		return NULL;
 
-	#ifdef DEBUG
-		printf("Message len: %d\n", (int)*size);
-	#endif
-
-	data = (char *) malloc(*size * sizeof(char));
-	bzero(data, sizeof(data));
-	if (!data) /* Check if malloc() was successful */
+	res = (char *) malloc(*size);
+	if (!res) /* Check if malloc() was successful */
 		return NULL;
 
-	return memcpy(data, str, *size);
+	return memcpy(res, data, *size);
 }
