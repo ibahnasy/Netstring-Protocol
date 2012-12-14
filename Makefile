@@ -12,6 +12,10 @@ client: netstring
 netstring:
 	$(CXX) $(CFLAGS) -c netstring.c
 
+test: netstring
+	$(CXX) $(CFLAGS) -o test_netstring test_netstring.c netstring.o
+	- ./test_netstring
+
 clean:
 	- rm *.o
-	- rm server client
+	- rm server client test_netstring
