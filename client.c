@@ -82,7 +82,7 @@ main(int argc , char **argv)
 		size_t send_size, enc_size, dec_size;
 
         /* getting message from input */
-        scanf("%s", send_buf); /* MUST free this pointer */
+        scanf("%s", send_buf); /* FIXME: A possible buffer overflow here. */
 		send_size = strlen(send_buf);
 
         encodedMessage = netstring_encode(send_buf,
