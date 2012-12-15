@@ -14,56 +14,62 @@
  *
  */
 
-/*
- * Netstring protocol implementation
- * 
- * char * netstring_encode(const char * str);
- * void * netstring_decode(const char *str, size_t *size)
- *
- */
-
+#include <stdio.h> /* snprintf */
+#include <stdlib.h> /* strtoll */
+#include <string.h> /* memcpy */
+#include <errno.h> /* errno */
+#include <limits.h> /* LONG_MAX, LONG_MIN */
 
 #include "netstring.h"
 
+#define SIZE_BUFFER_SZ 39
+
 char *
-netstring_encode(const char * str, size_t size)
+netstring_encode(const void *data, size_t size, size_t *res_size)
 {
-	int msg_buf_sz = (int)size + (int) strlen(str) + 2;
-	char msg_buf[39];
-	char * data;
+	int rc;
+	char *res;
+	char size_buf[SIZE_BUFFER_SZ];
+	size_t msg_buf_sz = size + 3; /* 3 bytes extra for ':', ',', and '\x00' */
 
-	snprintf(msg_buf, msg_buf_sz, "%d:%s,", (int) size, str); /* formatting to: length:string, */
+	rc = snprintf(size_buf, sizeof(size_buf), "%u", (unsigned int)size);
 
-	#ifdef DEBUG
-		printf("msg_buf: '%s'\n", msg_buf);
-	#endif
+	if (rc < 0) /* We encountered an error */
+		return NULL;
+	else if (rc >= (int)sizeof(size_buf)) /* Size of data is dangerously more than
+											 what we can handle. ABORT! */
+		return NULL;
+	else /* We successfully converted the size into a char array */
+		msg_buf_sz += rc;
 
-	data = (char *) malloc(msg_buf_sz * sizeof(char));
-	return memcpy(data, msg_buf, msg_buf_sz);
+	res = (char *) malloc(msg_buf_sz);
+	*res_size = snprintf(res, msg_buf_sz, "%s:%s,", size_buf,
+			(const char *)data);
+
+	/* Note that res_size will not include '\x00' */
+	if (*res_size + 1 != msg_buf_sz) /* Something aweful happened */
+		return NULL;
+
+	return res;
 }
 
-
 void *
-netstring_decode(const char *str, size_t *size)
+netstring_decode(const char *data, size_t *size)
 {
-	char *data;
-	char msg_buf_sz[39]; /* Enough to store a string of size more than
-						  * 2**128 or aprox. 10^38.532 bytes. Way more than a Yottabyte */
+	char *res;
+	char msg_buf_sz[SIZE_BUFFER_SZ]; /* Enough to store a string of size more than
+										2^128 or aprox. 10^38.532 bytes. Way more than a Yottabyte */
 	char *endptr;
-	register int i = 0;
-
-	#ifdef DEBUG
-		printf("str: %s\n", str); /* Mark your debug commands if used without macros. */
-	#endif
+	register unsigned int i = 0;
 
 	/* Make sure msg_buf_sz does not overflow. */
-	while(*str != ':' && i < (int) sizeof(msg_buf_sz))
+	while(*data != ':' && i < sizeof(msg_buf_sz))
 	{
-		msg_buf_sz[i] = *str++;
+		msg_buf_sz[i] = *data++;
 		++i;
 	}
 
-	++str; /* Advance `str' pointer past ':' */
+	++data; /* Advance `data' pointer past ':' */
 
 	*size = strtoll(msg_buf_sz, &endptr, 10);
 
@@ -74,17 +80,12 @@ netstring_decode(const char *str, size_t *size)
 	}
 
 	/* Past this point we know that we parsed a length successfuly. */
-	if (str[*size] != ',') /* Check if the data field ends with ',' per standard */
+	if (data[*size] != ',') /* Check if the data field ends with ',' per standard */
 		return NULL;
 
-	#ifdef DEBUG
-		printf("Message len: %d\n", (int)*size);
-	#endif
-
-	data = (char *) malloc(*size * sizeof(char));
-	bzero(data, sizeof(data));
-	if (!data) /* Check if malloc() was successful */
+	res = (char *) malloc(*size);
+	if (!res) /* Check if malloc() was successful */
 		return NULL;
 
-	return memcpy(data, str, *size);
+	return memcpy(res, data, *size);
 }

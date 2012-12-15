@@ -14,11 +14,6 @@
  *
  */
 
-/*
- *  NetString Client
- *
- */
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -35,16 +30,14 @@
 #define BUFFER_SIZE 39
 char * port = 0; /* listening port */
 
-int 
-main(int argc , char *argv[])
+int
+main(int argc , char **argv)
 {
     int status = 0; /* getaddrinfo status */
     int socketfd = 0;  
-    int msgLen = 0;
     struct addrinfo params;
     struct addrinfo *res;
     char msgBuff[BUFFER_SIZE]; /* buffer to hold coming messages from client */
-    char sendMsgBuff[BUFFER_SIZE]; /* buffer to hold message for sending */
 
     if (argc < 2)
     {
@@ -80,46 +73,40 @@ main(int argc , char *argv[])
         perror("connect");
         exit(1);
     }
-    
+
     while(1)
-    {    
-        size_t size;
-        char * encodedMessage;
-        char * decodedMessage;
+    {
+		char send_buf[1024];
+        char *encodedMessage;
+        char *decodedMessage;
+		size_t send_size, enc_size, dec_size;
+
         /* getting message from input */
-        scanf("%s", sendMsgBuff);
-        encodedMessage = (char *) malloc(BUFFER_SIZE);
+        scanf("%s", send_buf); /* FIXME: A possible buffer overflow here. */
+		send_size = strlen(send_buf);
 
-        encodedMessage = netstring_encode(sendMsgBuff, strlen(sendMsgBuff)); /* encoding with NetString */
-        
-        #ifdef DEBUG
-            printf("Formated Message: %s\n", encodedMessage);
-        #endif
+        encodedMessage = netstring_encode(send_buf,
+				send_size, &enc_size); /* encoding with NetString
+											STOP VIOLATING THE 80 CHARACTER WIDTH RULE */
 
-        send(socketfd, encodedMessage, strlen(encodedMessage), 0); /* sending encoded message to server */
-        
+        send(socketfd, encodedMessage, enc_size, 0); /* sending encoded message to server */
+		free(encodedMessage);
+
         /* receiving response from server */
-        msgLen = recv(socketfd, msgBuff, BUFFER_SIZE, 0); /* receiving response/message from server */
-        msgBuff[msgLen] = '\0';
+        recv(socketfd, msgBuff, BUFFER_SIZE, 0); /* receiving response/message from server */
+        decodedMessage = netstring_decode(msgBuff, &dec_size);
 
-        decodedMessage = (char * )malloc(BUFFER_SIZE);
+		printf("Response: '%.*s'\n", (unsigned int)dec_size, decodedMessage);
+		free(decodedMessage);
 
-        decodedMessage = netstring_decode(msgBuff, &size); 
-        decodedMessage[size] = '\0';
-
-        printf("Response: %s\n\n", decodedMessage);
-
-        #ifdef DEBUG
-            printf("%s\n\n", decodedMessage);
-        #endif
-
-        if (strcmp(sendMsgBuff, "end") == 0)
+		/* STOP TREATING EVERYTHING AS A "STRING"... THIS IS NOT JAVA! */
+        if (strncmp("end", send_buf, 3) == 0)
         {
             printf("Exiting...\n");
             break;
         }
     }
-    
+
     /* cleaning resources */
     freeaddrinfo(res);
     close(socketfd);

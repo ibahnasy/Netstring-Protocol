@@ -14,34 +14,14 @@
  *
  */
 
-/*
- * Netstring protocol header file
- * 
- * char * netstring_encode(const char * str);
- * void * netstring_decode(const char *str, size_t *size)
- *
- */
-
 #ifndef NETSTRING_H
 #define NETSTRING_H
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <errno.h> /* errno */
-#include <limits.h> /* LONG_MAX LONG_MIN */
-
-#define BUFFER_SIZE 39
-
 char *
-netstring_encode(const char * str, size_t size);
+netstring_encode(const void *, size_t, size_t *);
 
 void *
-netstring_decode(const char *str, size_t *size);
+netstring_decode(const char *, size_t *);
 
 
 #endif

@@ -38,7 +38,6 @@ char * port = "1100"; /* listening port */
 int 
 main()
 {
-	size_t size;
     int status = 0; /* getaddrinfo status */
     int socketfd = 0; 
     int newSocketfd = 0; 
@@ -99,41 +98,33 @@ main()
     }
 
     while(1)
-    {    
-        int i;
+    {
         char * msg = "OK";
         char * encodedMessage;
         char * decodedMessage;
+		size_t enc_size, dec_size;
 
         /* receiving data from connected client */
         if ((msgLen = recv(newSocketfd, msgBuff, BUFFER_SIZE, 0)) > 0)
         {
-            msgBuff[msgLen] = '\0';
-            decodedMessage = (char *) malloc(BUFFER_SIZE);
+            decodedMessage = netstring_decode(msgBuff, &dec_size);
 
-            decodedMessage = netstring_decode(msgBuff, &size);
-            msgBuff[size] = '\0';
-
-            if (strcmp(decodedMessage, "end") == 0) /* exit condition */
+            if (strncmp(decodedMessage, "end", 3) == 0) /* exit condition */
             {
                 printf("Exiting...\n");
+				free(decodedMessage);
                 break;
             }
 
-            printf("Message Received: ");
-            i = 0;
-            while(i < (int) size)
-                printf("%c", decodedMessage[i++]);
-
-            printf("\n");
+            printf("Message Received: '%.*s'\n", (unsigned int)dec_size, decodedMessage);
+			free(decodedMessage);
 
             /* sending reponse to client */
-            msg = "OK";
-            encodedMessage = (char *) malloc(BUFFER_SIZE);
-            encodedMessage = netstring_encode(msg, strlen(msg));
+            encodedMessage = netstring_encode(msg, strlen(msg), &enc_size);
 
-            send(newSocketfd, encodedMessage, sizeof(encodedMessage), 0);
-        }    
+            send(newSocketfd, encodedMessage, enc_size, 0);
+			free(encodedMessage);
+        }
     }
 
     /* cleaning resources */
